@@ -1,220 +1,219 @@
 #include "buggy.h"
 #include "word.h"
 
-std::mutex g_lockTST;
+bool wordSort(Word* word1, Word* word2)
+{
+   return std::strcmp(word1->get_data(), word2->get_data()) < 0;
+}
 
-static TST s_wordsTST;
-static Word s_word;
+static std::queue<Word *> inputQueue;
+static std::vector<Word *> s_wordsArray;
 static int s_totalFound;
+std::mutex mutexLock;
 
-TST::~TST()
+/**
+ * processWord	Process the user input while removing duplicates and insert them
+ * 				in the 'word list' (s_wordsArray)
+ *
+ * @param[in] wordInput Word entered by the user.
+ * @return void
+ */
+static void processWord(Word *wordInput)
 {
-  if (root_ != NULL)
+  bool found = false;
+
+  // Do not insert duplicate words
+  for (auto p : s_wordsArray)
   {
-    del(root_);
+
+    if (!std::strcmp(p->get_data(), wordInput->get_data()))
+    {
+      p->increment_count();
+      found = true;
+      break;
+    }
   }
-}
 
-void TST::del(Node *n)
-{
-  if (n == NULL)
-    return;
-  del(n->left);
-  del(n->mid);
-  del(n->right);
-  delete n;
-}
-
-Node *TST::put(Node *x, string key, int d)
-{
-  char c = key.at(d);
-  if (x == NULL)
+  if (!found)
   {
-    x = new Node();
-    x->c = c;
-    x->count = 0;
+    wordInput->increment_count();
+    s_wordsArray.push_back(wordInput);
   }
-  if (c < x->c)
-    x->left = put(x->left, key, d);
-  else if (c > x->c)
-    x->right = put(x->right, key, d);
-  else if (d < key.length() - 1)
-    x->mid = put(x->mid, key, d + 1);
   else
-    x->count++;
-  return x;
-}
-
-void TST::put(string key)
-{
-  root_ = put(root_, key, 0);
-}
-
-int TST::get(string key)
-{
-  Node *x = get(root_, key, 0);
-  if (x == NULL)
-    return 0;
-  return x->count;
-}
-
-Node *TST::get(Node *x, string key, int d)
-{
-  if (!x)
-    return x;
-  char c = key.at(d);
-  if (c < x->c)
-    return get(x->left, key, d);
-  else if (c > x->c)
-    return get(x->right, key, d);
-  else if (d < key.length() - 1)
-    return get(x->mid, key, d + 1);
-  else
-    return x;
-}
-
-int TST::printAll()
-{
-  queue<string> collectAll;
-  collect(root_, "", collectAll);
-  if (collectAll.empty())
-    return 0;
-  int size = collectAll.size();
-  while (collectAll.size() > 0)
   {
-    std::cout << "\n  " << collectAll.front();
-    collectAll.pop();
+    //De allocate memory for rejected words.
+    free(wordInput->get_data());
+    free(wordInput);
   }
-  printf("\n");
-  return size;
+  found = false; //Reset the flag for next word
 }
 
-void TST::collect(Node *x, string prefix, queue<string> &q)
-{
-  if (x == NULL)
-    return;
-  char c = x->c;
-  ;
-  if (x->count > 0)
-    q.push(prefix + c);
-  collect(x->left, prefix, q);
-
-  collect(x->mid, prefix + c, q);
-
-  collect(x->right, prefix, q);
-}
-
-// Worker thread: consume words passed from the main thread and insert them
-// in the 'word list' (s_wordsTST), while removing duplicates. Terminate when
-// the word 'end' is encountered.
 static void workerThread()
 {
-  bool endEncountered = false;
-  bool found = false;
+  bool endEncountered{false};
+  bool isQueueEmpty{true};
+  Word *word{nullptr};
 
   while (!endEncountered)
   {
-    if (s_word.data_[0]) // Do we have a new word?
     {
-      Word *w = new Word(s_word); // Copy the word
+      std::lock_guard<std::mutex> lck{mutexLock};
+      isQueueEmpty = inputQueue.empty();
+    }
 
-      s_word.data_[0] = 0; // Inform the producer that we consumed the word
+    if (!isQueueEmpty)
+    {
+      {
+        std::lock_guard<std::mutex> lck{mutexLock};
+        word = inputQueue.front();
+        inputQueue.pop();
+      }
 
-      endEncountered = std::strcmp(w->data_, "end") == 0;
+      endEncountered = std::strcmp(word->get_data(), "end") == 0;
 
       if (!endEncountered)
       {
-        g_lockTST.lock();
-        s_wordsTST.put(string(w->data_));
-        g_lockTST.unlock();
+        processWord(word);
       }
-      delete w;
     }
   }
-};
+}
 
-// Read input words from STDIN and pass them to the worker thread for
-// inclusion in the word list.
-// Terminate when the word 'end' has been entered.
-//
+static bool processInput(std::string inputWord)
+{
+  bool isEnd = false;
+  std::size_t pos = inputWord.find(" "); //handle cases in multiple words
+
+  if (!pos) 
+  {
+    pos = inputWord.length();
+  }
+  std::string currentWord = inputWord.substr(0, pos);
+
+  if (currentWord.length() != 0)
+  {
+    if ((currentWord.compare("end")) == 0)
+    {
+      isEnd = true;
+    }
+    //Lock the queue
+    {
+      std::lock_guard<std::mutex> lck{mutexLock};
+      Word *word = new Word((const char *)currentWord.c_str());
+      inputQueue.push(word);
+    }
+  }
+
+  return isEnd;
+}
+
 static void readInputWords()
 {
   bool endEncountered = false;
 
   std::thread *worker = new std::thread(workerThread);
 
-  // std::string str;
-  // std::getline(std::cin, str);
-
-  char *linebuf = new char[32];
-  s_word.data_ = new char[32];
+  std::string userInput;
+  std::cout << "\nEnter list of words, 'end' to terminate entering : \n";
 
   while (!endEncountered)
   {
-    if (!std::gets(linebuf)) // EOF?
+    if (!std::getline(std::cin, userInput))
+    {
       return;
-
-    endEncountered = std::strcmp(linebuf, "end") == 0;
-
-    // Pass the word to the worker thread
-    std::strcpy(s_word.data_, linebuf);
-    while (s_word.data_[0])
-      ; // Wait for the worker thread to consume it
+    }
+    else
+    {
+      endEncountered = processInput(userInput);
+    }
   }
 
   worker->join(); // Wait for the worker to terminate
 }
 
-// Repeatedly ask the user for a word and check whether it was present in the word list
-// Terminate on EOF
-//
+static void searchInput(std::string searchWord)
+{
+  bool found = false; //Initialize flag as 'Not found'
+  Word *w = new Word(searchWord.c_str());
+
+  // Search for the word
+  unsigned i;
+
+  for (i = 0; i < s_wordsArray.size(); ++i)
+  {
+    if (std::strcmp(s_wordsArray[i]->get_data(), w->get_data()) == 0)
+    {
+      found = true;
+      break;
+    }
+  }
+
+  if (found)
+  {
+    std::printf("SUCCESS: '%s' was present %d times in the initial word list\n",
+                s_wordsArray[i]->get_data(), s_wordsArray[i]->get_count());
+    ++s_totalFound;
+  }
+  else
+  {
+    std::printf("'%s' was NOT found in the initial word list\n", w->get_data());
+  }
+  found = false; //Reset the flag
+  free(w);       //Clear the allocated memory
+}
 
 static void lookupWords()
 {
-  bool found;
-  char *linebuf = new char[32];
+  std::string userSearchInput;
 
   for (;;)
   {
     std::printf("\nEnter a word for lookup:");
-    if (!std::gets(linebuf)) // EOF?
-      return;
-
-    // Search for the word
-    int count = s_wordsTST.get(string(linebuf));
-    if (count > 0)
-      found = true;
-
-    if (found)
+    if (!std::getline(std::cin, userSearchInput))
     {
-      std::printf("SUCCESS: '%s' was present %d times in the initial word list\n",
-                  linebuf, count);
-      ++s_totalFound;
+      return;
     }
-    else
-      std::printf("'%s' was NOT found in the initial word list\n", linebuf);
-  }
 
-  delete linebuf;
+    // Initialize the word to search for
+    std::size_t pos = userSearchInput.find(" "); // position of "live" in str
+    if (!pos)
+    {
+      pos = userSearchInput.length();
+    }
+
+    std::string word = userSearchInput.substr(0, pos);
+    if (word.length() > 0)
+    {
+      searchInput(word);
+    }
+  }
 }
 
 int main()
 {
   try
   {
-    std::cout << "\n=== Provide list of words (terminate when the word 'end' is entered) :\n";
     readInputWords();
 
-    std::cout << "\n=== Word List:\n";
-    s_totalFound = s_wordsTST.printAll();
+    // Sort the words alphabetically
+
+    std::sort(s_wordsArray.begin(), s_wordsArray.end(), wordSort);
+
+    // Print the word list
+    std::printf("\n=== Word list:\n");
+
+    for (auto p : s_wordsArray)
+    {
+      std::printf("%s %d\n", p->get_data(), p->get_count());
+    }
 
     lookupWords();
 
-    std::cout << "\n=== Total words found: " << s_totalFound;
+    printf("\n=== Total words found: %d\n", s_totalFound);
   }
   catch (std::exception &e)
   {
-    std::cout << "exception: " << e.what();
+    std::printf("error %s\n", e.what());
   }
 
   return 0;

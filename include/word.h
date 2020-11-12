@@ -1,22 +1,34 @@
 #ifndef WORD_H
 #define WORD_H
 
-struct Word
+class Word
 {
-    char *data_;
+public:
+    Word(const char* data_) :
+        data(::strdup(data_))
+    {}
 
-    Word(char *data) : data_(::strdup(data)){};
-    Word() : data_((char *)""){};
-    ~Word()
-    {
-        if (data_)
-            delete data_;
-    };
-    Word(Word &input)
-    {
-        data_ = new char[strlen(input.data_)];
-        strcpy(data_, input.data_);
-    };
+    Word() :
+        data((char*)"")
+    {}
+	
+	char * get_data() const
+	{
+		return data;
+	}
+	int get_count() const
+	{
+		return count;
+	}
+	void increment_count()
+	{
+		++count;
+	}
+	
+private:
+    char* data;
+    int count = 0;
+	
 };
 
 #endif
