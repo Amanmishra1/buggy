@@ -11,13 +11,6 @@ static std::vector<Word *> s_wordsArray;
 static int s_totalFound;
 std::mutex mutexLock;
 
-/**
- * processWord	Process the user input while removing duplicates and insert them
- * 				in the 'word list' (s_wordsArray)
- *
- * @param[in] wordInput Word entered by the user.
- * @return void
- */
 static void processWord(Word *wordInput)
 {
   bool found = false;
@@ -25,7 +18,6 @@ static void processWord(Word *wordInput)
   // Do not insert duplicate words
   for (auto p : s_wordsArray)
   {
-
     if (!std::strcmp(p->get_data(), wordInput->get_data()))
     {
       p->increment_count();
@@ -41,11 +33,10 @@ static void processWord(Word *wordInput)
   }
   else
   {
-    //De allocate memory for rejected words.
+    //Delete memory for duplicate words.
     free(wordInput->get_data());
     free(wordInput);
   }
-  found = false; //Reset the flag for next word
 }
 
 static void workerThread()
@@ -79,15 +70,16 @@ static void workerThread()
   }
 }
 
-static bool processInput(std::string inputWord)
+static bool processInputs(std::string inputWord)
 {
   bool isEnd = false;
-  std::size_t pos = inputWord.find(" "); //handle cases in multiple words
+  std::size_t pos = inputWord.find(" "); 
 
   if (!pos) 
   {
     pos = inputWord.length();
   }
+  
   std::string currentWord = inputWord.substr(0, pos);
 
   if (currentWord.length() != 0)
@@ -124,7 +116,7 @@ static void readInputWords()
     }
     else
     {
-      endEncountered = processInput(userInput);
+      endEncountered = processInputs(userInput);
     }
   }
 
@@ -133,15 +125,14 @@ static void readInputWords()
 
 static void searchInput(std::string searchWord)
 {
-  bool found = false; //Initialize flag as 'Not found'
-  Word *w = new Word(searchWord.c_str());
+  bool found = false; 
+  Word *word = new Word(searchWord.c_str());
 
-  // Search for the word
   unsigned i;
 
   for (i = 0; i < s_wordsArray.size(); ++i)
   {
-    if (std::strcmp(s_wordsArray[i]->get_data(), w->get_data()) == 0)
+    if (std::strcmp(s_wordsArray[i]->get_data(), word->get_data()) == 0)
     {
       found = true;
       break;
@@ -150,38 +141,38 @@ static void searchInput(std::string searchWord)
 
   if (found)
   {
-    std::printf("SUCCESS: '%s' was present %d times in the initial word list\n",
-                s_wordsArray[i]->get_data(), s_wordsArray[i]->get_count());
+    std::cout << "SUCCESS: " << s_wordsArray[i]->get_data() << " was present " \
+              << s_wordsArray[i]->get_count() << "  times in the initial word list\n";
     ++s_totalFound;
   }
   else
   {
-    std::printf("'%s' was NOT found in the initial word list\n", w->get_data());
+    std::cout << word->get_data() << " was not found in initial word list\n";
   }
-  found = false; //Reset the flag
-  free(w);       //Clear the allocated memory
+  
+  free(word);
 }
 
 static void lookupWords()
 {
-  std::string userSearchInput;
+  std::string input;
 
   for (;;)
   {
     std::printf("\nEnter a word for lookup:");
-    if (!std::getline(std::cin, userSearchInput))
+    if (!std::getline(std::cin, input))
     {
       return;
     }
 
     // Initialize the word to search for
-    std::size_t pos = userSearchInput.find(" "); // position of "live" in str
+    std::size_t pos = input.find(" "); // position of "live" in str
     if (!pos)
     {
-      pos = userSearchInput.length();
+      pos = input.length();
     }
 
-    std::string word = userSearchInput.substr(0, pos);
+    std::string word = input.substr(0, pos);
     if (word.length() > 0)
     {
       searchInput(word);
@@ -196,7 +187,6 @@ int main()
     readInputWords();
 
     // Sort the words alphabetically
-
     std::sort(s_wordsArray.begin(), s_wordsArray.end(), wordSort);
 
     // Print the word list

@@ -26,8 +26,8 @@ public:
 	}
 	
 private:
-    char* data;
-    int count = 0;
+    char* data{nullptr};
+    int count{0};
 	
 };
 
