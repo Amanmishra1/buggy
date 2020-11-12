@@ -11,6 +11,7 @@ find_package (Threads)
 
 set(HEADERS
   include/buggy.h
+  include/word.h
 )
 
 set(SOURCES 

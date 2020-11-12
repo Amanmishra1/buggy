@@ -1,4 +1,5 @@
 #include "buggy.h"
+#include "word.h"
 
 std::mutex g_lockTST;
 
@@ -12,7 +13,7 @@ TST::~TST()
   {
     del(root_);
   }
-};
+}
 
 void TST::del(Node *n)
 {
@@ -22,7 +23,7 @@ void TST::del(Node *n)
   del(n->mid);
   del(n->right);
   delete n;
-};
+}
 
 Node *TST::put(Node *x, string key, int d)
 {
@@ -47,11 +48,6 @@ Node *TST::put(Node *x, string key, int d)
 void TST::put(string key)
 {
   root_ = put(root_, key, 0);
-}
-
-bool TST::contains(string key)
-{
-  return (get(key) != 0);
 }
 
 int TST::get(string key)
@@ -86,7 +82,6 @@ int TST::printAll()
   int size = collectAll.size();
   while (collectAll.size() > 0)
   {
-    //std::printf("\n %s " , collectAll->front());
     std::cout << "\n  " << collectAll.front();
     collectAll.pop();
   }
@@ -119,18 +114,18 @@ static void workerThread()
 
   while (!endEncountered)
   {
-    if (s_word.data[0]) // Do we have a new word?
+    if (s_word.data_[0]) // Do we have a new word?
     {
       Word *w = new Word(s_word); // Copy the word
 
-      s_word.data[0] = 0; // Inform the producer that we consumed the word
+      s_word.data_[0] = 0; // Inform the producer that we consumed the word
 
-      endEncountered = std::strcmp(w->data, "end") == 0;
+      endEncountered = std::strcmp(w->data_, "end") == 0;
 
       if (!endEncountered)
       {
         g_lockTST.lock();
-        s_wordsTST.put(string(w->data));
+        s_wordsTST.put(string(w->data_));
         g_lockTST.unlock();
       }
       delete w;
@@ -148,8 +143,11 @@ static void readInputWords()
 
   std::thread *worker = new std::thread(workerThread);
 
+  // std::string str;
+  // std::getline(std::cin, str);
+
   char *linebuf = new char[32];
-  s_word.data = new char[32];
+  s_word.data_ = new char[32];
 
   while (!endEncountered)
   {
@@ -159,8 +157,8 @@ static void readInputWords()
     endEncountered = std::strcmp(linebuf, "end") == 0;
 
     // Pass the word to the worker thread
-    std::strcpy(s_word.data, linebuf);
-    while (s_word.data[0])
+    std::strcpy(s_word.data_, linebuf);
+    while (s_word.data_[0])
       ; // Wait for the worker thread to consume it
   }
 
@@ -204,20 +202,19 @@ int main()
 {
   try
   {
-    std::printf("\n=== Provide list of words (List terminates when the word 'end' has been entered) :\n");
+    std::cout << "\n=== Provide list of words (terminate when the word 'end' is entered) :\n";
     readInputWords();
 
-    // Print the word list
-    std::printf("\n=== Word list:\n");
+    std::cout << "\n=== Word List:\n";
     s_totalFound = s_wordsTST.printAll();
 
     lookupWords();
 
-    printf("\n=== Total words found: %d\n", s_totalFound);
+    std::cout << "\n=== Total words found: " << s_totalFound;
   }
   catch (std::exception &e)
   {
-    std::printf("error %s\n", e.what());
+    std::cout << "exception: " << e.what();
   }
 
   return 0;
