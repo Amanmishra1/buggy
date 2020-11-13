@@ -1,19 +1,25 @@
 #include "buggy.h"
-#include "word.h"
+
+//using anonymous namespace. using global variables not a good practice.
+namespace
+{
+static std::queue<Word *> inputQueue;
+static std::vector<Word *> s_wordsArray;
+static int s_totalFound;
+
+std::mutex mutexLock;
+
+constexpr const char* kEnd = "end";
+}
 
 bool wordSort(Word* word1, Word* word2)
 {
    return std::strcmp(word1->get_data(), word2->get_data()) < 0;
 }
 
-static std::queue<Word *> inputQueue;
-static std::vector<Word *> s_wordsArray;
-static int s_totalFound;
-std::mutex mutexLock;
-
 static void processWord(Word *wordInput)
 {
-  bool found = false;
+  bool found{false};
 
   // Do not insert duplicate words
   for (auto p : s_wordsArray)
@@ -33,7 +39,6 @@ static void processWord(Word *wordInput)
   }
   else
   {
-    //Delete memory for duplicate words.
     free(wordInput->get_data());
     free(wordInput);
   }
@@ -60,7 +65,7 @@ static void workerThread()
         inputQueue.pop();
       }
 
-      endEncountered = std::strcmp(word->get_data(), "end") == 0;
+      endEncountered = std::strcmp(word->get_data(), kEnd) == 0;
 
       if (!endEncountered)
       {
@@ -72,7 +77,7 @@ static void workerThread()
 
 static bool processInputs(std::string inputWord)
 {
-  bool isEnd = false;
+  bool isEnd{false};
   std::size_t pos = inputWord.find(" "); 
 
   if (!pos) 
@@ -84,14 +89,14 @@ static bool processInputs(std::string inputWord)
 
   if (currentWord.length() != 0)
   {
-    if ((currentWord.compare("end")) == 0)
+    if ((currentWord.compare(kEnd)) == 0)
     {
       isEnd = true;
     }
-    //Lock the queue
+    
     {
       std::lock_guard<std::mutex> lck{mutexLock};
-      Word *word = new Word((const char *)currentWord.c_str());
+      Word *word = new Word(currentWord.c_str());
       inputQueue.push(word);
     }
   }
@@ -126,13 +131,13 @@ static void readInputWords()
 static void searchInput(std::string searchWord)
 {
   bool found = false; 
-  Word *word = new Word(searchWord.c_str());
+  std::unique_ptr<Word> word =  std::make_unique<Word>(searchWord.c_str());
+  
+  unsigned index;
 
-  unsigned i;
-
-  for (i = 0; i < s_wordsArray.size(); ++i)
+  for (index = 0; index < s_wordsArray.size(); ++index)
   {
-    if (std::strcmp(s_wordsArray[i]->get_data(), word->get_data()) == 0)
+    if (std::strcmp(s_wordsArray[index]->get_data(), word->get_data()) == 0)
     {
       found = true;
       break;
@@ -141,16 +146,14 @@ static void searchInput(std::string searchWord)
 
   if (found)
   {
-    std::cout << "SUCCESS: " << s_wordsArray[i]->get_data() << " was present " \
-              << s_wordsArray[i]->get_count() << "  times in the initial word list\n";
+    std::cout << "SUCCESS: " << s_wordsArray[index]->get_data() << " was present " \
+              << s_wordsArray[index]->get_count() << "  times in the initial word list\n";
     ++s_totalFound;
   }
   else
   {
     std::cout << word->get_data() << " was not found in initial word list\n";
   }
-  
-  free(word);
 }
 
 static void lookupWords()

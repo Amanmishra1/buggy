@@ -1,0 +1,5 @@
+1. To read words from standard input, used a queue to store it in sequence
+2. Used a lock guard to avoid crash, since it is multithreaded
+3. Worker thread parallely reads from queue, checks duplicate entries, maintains count, removes from queue
+4. A custom sort function to sort all the words present in the vector in ascending order
+5. Added searchInput function to search for a word and its count, displays success or not found

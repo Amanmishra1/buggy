@@ -2,11 +2,9 @@ cmake_minimum_required(VERSION 3.10)
 
 project(WordReader)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 
-enable_testing()
-add_subdirectory(googletest)
 find_package (Threads)
 
 set(HEADERS
@@ -31,5 +29,3 @@ target_include_directories(WordMatcher
 )
 
 target_link_libraries (WordMatcher ${CMAKE_THREAD_LIBS_INIT})
-
-#add_subdirectory(test)
